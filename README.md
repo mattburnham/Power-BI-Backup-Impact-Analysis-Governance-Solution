@@ -7,7 +7,7 @@
   <em>One-Click, Designed for Everyone</em>
 </p>
 
-# Impact Analysis and Governance for Power BI + Microsoft Fabric
+# Impact Analysis and Governance for Power BI + Fabric
 
 ### This all-in-one solution is designed to be ran by ANYONE. 
 - Everything within the script is limited to your access within the Power BI and/or Fabric environment.
