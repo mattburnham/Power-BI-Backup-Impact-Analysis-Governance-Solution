@@ -824,6 +824,13 @@ $fabricItemsRenameMap = @{
     "description" = "FabricItemDescription"
 }
 
+# Define renaming map for Fabric Dataflows (Gen 2 CICD)
+$fabricDataflowRenameMap = @{
+    "id" = "DataflowId";
+    "displayName" = "DataflowName";
+    "description" = "DataflowDescription"
+}
+
 
 
 # Fetch and filter workspaces
@@ -1051,6 +1058,7 @@ foreach ($workspace in $workspacesInfo) {
 
 Write-Output "Workspace [$($workspace.WorkspaceName)] Dataflow metadata extraction process started."
 
+    # Fetch Gen 1 and Gen 2 dataflows using Power BI API
     $dataflowsUrl = "$($global:PowerBIEndpoints.ApiPrefix)/v1.0/myorg/groups/$($workspace.WorkspaceId)/dataflows"
     $dataflowsResponse = Invoke-PowerBIRestMethod -Method GET -Url $dataflowsUrl | ConvertFrom-Json
 
@@ -1099,7 +1107,40 @@ Write-Output "Workspace [$($workspace.WorkspaceName)] Dataflow metadata extracti
             }
         }
     }
-Write-Output "Workspace [$($workspace.WorkspaceName)] Dataflow metadata extraction process started."
+
+    # Fetch Gen 2 CICD dataflows using Fabric API
+    try {
+        $fabricDataflowsUrl = "https://api.fabric.microsoft.com/v1/workspaces/$($workspace.WorkspaceId)/dataflows"
+        $fabricHeaders = @{
+            'Authorization' = "Bearer $(Get-CurrentAccessToken)"
+            'Content-Type' = 'application/json'
+        }
+        $fabricDataflowsResponse = Invoke-RestMethod -Uri $fabricDataflowsUrl -Headers $fabricHeaders -Method GET -ErrorAction Stop
+
+        # Ensure response is not null before looping
+        if ($fabricDataflowsResponse.value) {
+            foreach ($fabricDataflow in $fabricDataflowsResponse.value) {
+                # Map Fabric API response to match Power BI API structure using rename map
+                $renamedFabricDataflow = Rename-Properties -object $fabricDataflow -renameMap $fabricDataflowRenameMap
+                $renamedFabricDataflow | Add-Member -NotePropertyName "WorkspaceId" -NotePropertyValue $workspace.WorkspaceId -Force
+                $renamedFabricDataflow | Add-Member -NotePropertyName "WorkspaceName" -NotePropertyValue $workspace.WorkspaceName -Force
+                $renamedFabricDataflow | Add-Member -NotePropertyName "DataflowGeneration" -NotePropertyValue "Gen 2 CICD" -Force
+                
+                # Store DataflowId and DataflowName in a lookup table
+                if ($fabricDataflow.id) {  
+                    $dataflowNameLookup[$fabricDataflow.id] = $fabricDataflow.displayName  
+                }
+
+                $dataflowsInfo += $renamedFabricDataflow
+            }
+        }
+    }
+    catch {
+        # Silently continue if Fabric API is not available or returns an error
+        # This allows the script to work in environments without Fabric API access
+    }
+
+Write-Output "Workspace [$($workspace.WorkspaceName)] Dataflow metadata extraction process completed."
 } 
 
 
@@ -1404,24 +1445,24 @@ Write-Output "Power BI Environment Detail Extract Process Completed. Excel outpu
 
 Write-Output "Model Backup Process Started"
 
+# Construct the folder path and create it if it doesn't exist (only once, before the loop)
+$modelBackupsPath = "$baseFolderPath\Model Backups"
+if (-not (Test-Path $modelBackupsPath)) {
+    New-Item -ItemType Directory -Force -Path $modelBackupsPath | Out-Null
+}
+
+# Construct the date model backup folder path (clear if it already exists, only once)
+$folderPath = "$modelBackupsPath\$date"
+if (Test-Path $folderPath) {
+    Write-Host "[INFO] Clearing existing model backup folder for today: $folderPath"
+    Remove-Item -Path $folderPath -Recurse -Force -ErrorAction SilentlyContinue
+}
+New-Item -ItemType Directory -Force -Path $folderPath | Out-Null
+
 # Loop through datasetsInfo collection to perform model export
 foreach ($dataset in $datasetsInfo) {
     # Get workspace details
     $workspace = $workspacesInfo | Where-Object { $_.WorkspaceId -eq $dataset.WorkspaceId }
-
-        # Construct the folder path and create it if it doesn't exist
-        $modelBackupsPath = "$baseFolderPath\Model Backups"
-        if (-not (Test-Path $modelBackupsPath)) {
-            New-Item -ItemType Directory -Force -Path $modelBackupsPath | Out-Null
-        }
-
-        # Construct the date model backup folder path (clear if it already exists)
-        $folderPath = "$modelBackupsPath\$date"
-        if (Test-Path $folderPath) {
-            Write-Host "[INFO] Clearing existing model backup folder for today: $folderPath"
-            Remove-Item -Path $folderPath -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        New-Item -ItemType Directory -Force -Path $folderPath | Out-Null
 
     # Check if the workspace is Premium or Fabric capacity before proceeding
     if ($workspace.WorkspaceIsOnDedicatedCapacity -eq $true) {
@@ -2380,3 +2421,4 @@ Write-Output "All Excel files processed and combined successfully."
 $scriptEndTime = Get-Date
 $elapsedTime = New-TimeSpan -Start $scriptStartTime -End $scriptEndTime
 Write-Output "Total Elapsed Time: $($elapsedTime.Hours)h $($elapsedTime.Minutes)m $($elapsedTime.Seconds)s"
+ 
