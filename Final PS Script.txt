@@ -768,7 +768,7 @@ function Show-RunModeDialog {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "ImpactIQ - Select Run Mode"
     $form.StartPosition = 'CenterScreen'
-    $form.Size = New-Object System.Drawing.Size(440, 210)
+    $form.Size = New-Object System.Drawing.Size(440, 300)
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
@@ -799,9 +799,29 @@ function Show-RunModeDialog {
     })
     $form.Controls.Add($btnReports)
 
+    $btnModels = New-Object System.Windows.Forms.Button
+    $btnModels.Text = "Run against specific models"
+    $btnModels.Size = New-Object System.Drawing.Size(380, 40)
+    $btnModels.Location = New-Object System.Drawing.Point(20, 160)
+    $btnModels.Add_Click({
+        $form.Tag = 'Models'
+        $form.Close()
+    })
+    $form.Controls.Add($btnModels)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "Cancel"
+    $btnCancel.Size = New-Object System.Drawing.Size(380, 30)
+    $btnCancel.Location = New-Object System.Drawing.Point(20, 210)
+    $btnCancel.Add_Click({
+        $form.Tag = 'Cancel'
+        $form.Close()
+    })
+    $form.Controls.Add($btnCancel)
+
     $form.Add_FormClosing({
         param($sender, $e)
-        if (-not $form.Tag) { $form.Tag = 'Workspaces' }
+        if (-not $form.Tag) { $form.Tag = 'Cancel' }
     })
 
     [void]$form.ShowDialog()
@@ -1041,6 +1061,237 @@ function Show-ReportPicker {
     return $selectedReports
 }
 
+# ================================
+# Show Model Scope Selection Dialog
+# ================================
+function Show-ModelScopeDialog {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "ImpactIQ - Model Selection Scope"
+    $form.StartPosition = 'CenterScreen'
+    $form.Size = New-Object System.Drawing.Size(440, 250)
+    $form.TopMost = $true
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Which models would you like to choose from?"
+    $label.AutoSize = $true
+    $label.Location = New-Object System.Drawing.Point(20, 20)
+    $form.Controls.Add($label)
+
+    $btnAll = New-Object System.Windows.Forms.Button
+    $btnAll.Text = "Models from ALL workspaces"
+    $btnAll.Size = New-Object System.Drawing.Size(380, 40)
+    $btnAll.Location = New-Object System.Drawing.Point(20, 55)
+    $btnAll.Add_Click({
+        $form.Tag = 'All'
+        $form.Close()
+    })
+    $form.Controls.Add($btnAll)
+
+    $btnSpecific = New-Object System.Windows.Forms.Button
+    $btnSpecific.Text = "Models from specific workspace(s)"
+    $btnSpecific.Size = New-Object System.Drawing.Size(380, 40)
+    $btnSpecific.Location = New-Object System.Drawing.Point(20, 105)
+    $btnSpecific.Add_Click({
+        $form.Tag = 'Specific'
+        $form.Close()
+    })
+    $form.Controls.Add($btnSpecific)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "Cancel"
+    $btnCancel.Size = New-Object System.Drawing.Size(380, 30)
+    $btnCancel.Location = New-Object System.Drawing.Point(20, 155)
+    $btnCancel.Add_Click({
+        $form.Tag = 'Cancel'
+        $form.Close()
+    })
+    $form.Controls.Add($btnCancel)
+
+    $form.Add_FormClosing({
+        param($sender, $e)
+        if (-not $form.Tag) { $form.Tag = 'Cancel' }
+    })
+
+    [void]$form.ShowDialog()
+    return $form.Tag
+}
+
+# ================================
+# Show Model Picker Dialog
+# ================================
+function Show-ModelPicker {
+    param(
+        [Parameter(Mandatory)]
+        [array]$Models
+    )
+
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $form               = New-Object System.Windows.Forms.Form
+    $form.Text          = "Select Models"
+    $form.StartPosition = 'CenterScreen'
+    $form.Size          = New-Object System.Drawing.Size(650,580)
+    $form.TopMost       = $true
+
+    # Instruction label
+    $lbl                = New-Object System.Windows.Forms.Label
+    $lbl.Text           = "Select the models to run against (reports using these models will be included automatically):"
+    $lbl.AutoSize       = $true
+    $lbl.Location       = New-Object System.Drawing.Point(12,12)
+    $form.Controls.Add($lbl)
+
+    # Search label
+    $lblSearch          = New-Object System.Windows.Forms.Label
+    $lblSearch.Text     = "Search:"
+    $lblSearch.AutoSize = $true
+    $lblSearch.Location = New-Object System.Drawing.Point(12,40)
+    $form.Controls.Add($lblSearch)
+
+    # Search TextBox
+    $txtSearch          = New-Object System.Windows.Forms.TextBox
+    $txtSearch.Location = New-Object System.Drawing.Point(70,37)
+    $txtSearch.Size     = New-Object System.Drawing.Size(552,23)
+    $form.Controls.Add($txtSearch)
+
+    # CheckedListBox
+    $clb                = New-Object System.Windows.Forms.CheckedListBox
+    $clb.Location       = New-Object System.Drawing.Point(12,70)
+    $clb.Size           = New-Object System.Drawing.Size(610,380)
+    $clb.CheckOnClick   = $true
+    $clb.Sorted         = $true
+
+    # Build display items
+    $allModelItems = @()
+    foreach ($mdl in $Models) {
+        $display = "{0} - {1} ({2})" -f $mdl.WorkspaceName, $mdl.DatasetName, $mdl.DatasetId
+        $item = [pscustomobject]@{
+            Display       = $display
+            DatasetId     = $mdl.DatasetId
+            DatasetName   = $mdl.DatasetName
+            WorkspaceId   = $mdl.WorkspaceId
+            WorkspaceName = $mdl.WorkspaceName
+        }
+        $item | Add-Member -MemberType ScriptMethod -Name ToString -Value { $this.Display } -Force
+        $allModelItems += $item
+    }
+
+    # Persistent checked state across search filtering
+    $persistentCheckedIds = @{}
+
+    # Initial population
+    foreach ($item in $allModelItems) {
+        [void]$clb.Items.Add($item)
+    }
+    $clb.DisplayMember = 'Display'
+    $form.Controls.Add($clb)
+
+    # Track check/uncheck
+    $clb.Add_ItemCheck({
+        param($sender, $e)
+        $item = $clb.Items[$e.Index]
+        if ($e.NewValue -eq 'Checked') {
+            $persistentCheckedIds[$item.DatasetId] = $true
+        } elseif ($e.NewValue -eq 'Unchecked') {
+            $persistentCheckedIds.Remove($item.DatasetId)
+        }
+    })
+
+    # Search filter logic
+    $txtSearch.Add_TextChanged({
+        $searchText = $txtSearch.Text
+        $clb.BeginUpdate()
+        $clb.Items.Clear()
+        $escapedSearchText = [regex]::Escape($searchText)
+        foreach ($item in $allModelItems) {
+            if ([string]::IsNullOrWhiteSpace($searchText) -or
+                $item.Display -imatch $escapedSearchText) {
+                $index = $clb.Items.Add($item)
+                if ($persistentCheckedIds.ContainsKey($item.DatasetId)) {
+                    $clb.SetItemChecked($index, $true)
+                }
+            }
+        }
+        $clb.EndUpdate()
+    })
+
+    # "Select All" checkbox
+    $chkAll            = New-Object System.Windows.Forms.CheckBox
+    $chkAll.Text       = "Select All"
+    $chkAll.AutoSize   = $true
+    $chkAll.Location   = New-Object System.Drawing.Point(12,460)
+    $chkAll.Add_CheckedChanged({
+        for ($i=0; $i -lt $clb.Items.Count; $i++) {
+            $clb.SetItemChecked($i, $chkAll.Checked)
+        }
+    })
+    $form.Controls.Add($chkAll)
+
+    # "Clear All" button
+    $btnClearAll       = New-Object System.Windows.Forms.Button
+    $btnClearAll.Text  = "Clear All"
+    $btnClearAll.Width = 80
+    $btnClearAll.Location = New-Object System.Drawing.Point(100,458)
+    $btnClearAll.Add_Click({
+        for ($i=0; $i -lt $clb.Items.Count; $i++) {
+            $clb.SetItemChecked($i, $false)
+        }
+        $chkAll.Checked = $false
+    })
+    $form.Controls.Add($btnClearAll)
+
+    # OK button
+    $okBtn             = New-Object System.Windows.Forms.Button
+    $okBtn.Text        = "OK"
+    $okBtn.Width       = 100
+    $okBtn.Location    = New-Object System.Drawing.Point(416,500)
+    $okBtn.Add_Click({
+        $form.Tag = 'OK'
+        $form.Close()
+    })
+    $form.Controls.Add($okBtn)
+
+    # Cancel button
+    $cancelBtn         = New-Object System.Windows.Forms.Button
+    $cancelBtn.Text    = "Cancel"
+    $cancelBtn.Width   = 100
+    $cancelBtn.Location= New-Object System.Drawing.Point(522,500)
+    $cancelBtn.Add_Click({
+        $form.Tag = 'Cancel'
+        $form.Close()
+    })
+    $form.Controls.Add($cancelBtn)
+
+    # Timer (auto-close after 2 minutes)
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 120000
+    $timer.Add_Tick({
+        $timer.Stop()
+        $form.Tag = 'Timeout'
+        $form.Close()
+    })
+    $timer.Start()
+
+    $form.AcceptButton = $okBtn
+    $form.CancelButton = $cancelBtn
+    [void]$form.ShowDialog()
+
+    if ($form.Tag -eq 'Cancel') {
+        return $null
+    }
+
+    # Gather selected models from persistent store
+    $selectedDatasetIds = @($persistentCheckedIds.Keys)
+    $selectedModels = @($allModelItems | Where-Object { $selectedDatasetIds -contains $_.DatasetId })
+
+    return $selectedModels
+}
+
 
 # Define renaming maps for each type of object
 $workspaceRenameMap = @{
@@ -1195,6 +1446,11 @@ while ($reportPickerCancelled) {
     $reportPickerCancelled = $false
     $runMode = Show-RunModeDialog
 
+if ($runMode -eq 'Cancel') {
+    Write-Host "[INFO] Run cancelled by user." -ForegroundColor Yellow
+    exit
+}
+
 if ($runMode -eq 'Reports') {
     # ---- Reports Mode: choose scope, optionally pick workspaces, then pick reports ----
     # Each sub-dialog cancel steps back ONE level (instead of bouncing all the way
@@ -1323,35 +1579,188 @@ if ($runMode -eq 'Reports') {
     # If the user backed all the way out, re-show the run-mode selector
     if ($reportPickerCancelled) { continue }
 
+} elseif ($runMode -eq 'Models') {
+    # ---- Models Mode: choose scope, optionally pick workspaces, then pick models ----
+    # Reports that use the selected models are automatically included.
+    $modelSelectionComplete = $false
+    while (-not $modelSelectionComplete) {
+
+        $modelScope = Show-ModelScopeDialog
+
+        if ($modelScope -eq 'Cancel') {
+            Write-Host "[INFO] Model scope selection cancelled. Returning to run mode selection..."
+            $reportPickerCancelled = $true
+            break
+        }
+
+        # Decide which workspaces to scan for models
+        $workspacesToScan = $null
+        if ($modelScope -eq 'Specific') {
+            $scopeSelection = $null
+            $scopeCancelled = $false
+            try {
+                $scopeSelection = Show-WorkspacePicker -Workspaces $workspacesResponse.value
+            }
+            catch {
+                $scopeCancelled = $true
+            }
+            if ($scopeCancelled) {
+                Write-Host "[INFO] Workspace selection cancelled. Returning to model scope selection..."
+                continue
+            }
+
+            $scopeWorkspaceIds = @($scopeSelection.SelectedWorkspaceIds)
+            if (-not $scopeWorkspaceIds -or $scopeWorkspaceIds.Count -eq 0) {
+                Write-Warning "No workspaces selected - showing models from ALL workspaces instead."
+                $workspacesToScan = $workspacesResponse.value
+            } else {
+                $workspacesToScan = @($workspacesResponse.value | Where-Object { $scopeWorkspaceIds -contains $_.id })
+            }
+        }
+        else {
+            # 'All' - scan every accessible workspace
+            $workspacesToScan = $workspacesResponse.value
+        }
+
+        # ---- Fetch models (datasets) from the chosen workspaces ----
+        Write-Host "[INFO] Fetching models for selection..."
+        $allModelsForPicker = @()
+        $wsCount = 0
+        $wsTotal = @($workspacesToScan).Count
+        foreach ($ws in $workspacesToScan) {
+            $wsCount++
+            Write-Host "`r[INFO] Scanning workspace $wsCount of $($wsTotal): $($ws.name)" -NoNewline
+            $datasetsUrl = "$($global:PowerBIEndpoints.ApiPrefix)/v1.0/myorg/groups/$($ws.id)/datasets"
+            try {
+                $datasetsResp = Invoke-PowerBIRestMethod -Method GET -Url $datasetsUrl | ConvertFrom-Json
+                foreach ($ds in $datasetsResp.value) {
+                    $allModelsForPicker += [pscustomobject]@{
+                        DatasetId     = $ds.id
+                        DatasetName   = $ds.name
+                        WorkspaceId   = $ws.id
+                        WorkspaceName = $ws.name
+                    }
+                }
+            } catch { }
+        }
+        Write-Host ""
+        Write-Host "[INFO] Found $($allModelsForPicker.Count) models across $($wsTotal) workspace(s)."
+
+        if ($allModelsForPicker.Count -eq 0) {
+            Write-Warning "No models found in the selected workspace(s). Returning to model scope selection..."
+            continue
+        }
+
+        # ---- Show model picker ----
+        $selectedModels = Show-ModelPicker -Models $allModelsForPicker
+
+        if ($null -eq $selectedModels) {
+            Write-Host "[INFO] Model selection cancelled. Returning to model scope selection..."
+            continue
+        }
+
+        if ($selectedModels.Count -eq 0) {
+            Write-Warning "No models selected. Returning to model scope selection..."
+            continue
+        }
+
+        # Build the selected dataset IDs set
+        $global:SelectedDatasetIds = @{}
+        foreach ($mdl in $selectedModels) {
+            $global:SelectedDatasetIds[$mdl.DatasetId] = $true
+        }
+
+        # Now fetch reports from ALL workspaces to find which ones use the selected models
+        Write-Host "[INFO] Scanning all workspaces for reports connected to the selected model(s)..."
+        $global:SelectedReportIds = @{}
+        $neededWorkspaceIds = @()
+
+        # Include the model workspaces themselves
+        foreach ($mdl in $selectedModels) {
+            $neededWorkspaceIds += $mdl.WorkspaceId
+        }
+
+        $wsCount = 0
+        $wsTotal = @($workspacesResponse.value).Count
+        foreach ($ws in $workspacesResponse.value) {
+            $wsCount++
+            Write-Host "`r[INFO] Scanning workspace $wsCount of $($wsTotal): $($ws.name)" -NoNewline
+            $reportsUrl = "$($global:PowerBIEndpoints.ApiPrefix)/v1.0/myorg/groups/$($ws.id)/reports"
+            try {
+                $reportsResp = Invoke-PowerBIRestMethod -Method GET -Url $reportsUrl | ConvertFrom-Json
+                foreach ($rpt in $reportsResp.value) {
+                    if ($rpt.datasetId -and $global:SelectedDatasetIds.ContainsKey($rpt.datasetId)) {
+                        $global:SelectedReportIds[$rpt.id] = $true
+                        $neededWorkspaceIds += $ws.id
+                    }
+                }
+            } catch { }
+        }
+        Write-Host ""
+        $neededWorkspaceIds = $neededWorkspaceIds | Select-Object -Unique
+
+        Write-Host "[INFO] Found $($global:SelectedReportIds.Count) report(s) connected to $($selectedModels.Count) selected model(s)."
+
+        # Build workspacesInfo from needed workspaces
+        foreach ($workspace in $workspacesResponse.value) {
+            if ($neededWorkspaceIds -notcontains $workspace.id) { continue }
+            $workspacesInfo += Rename-Properties -object $workspace -renameMap $workspaceRenameMap
+        }
+
+        if ($workspacesInfo.Count -eq 0) {
+            Write-Warning "No accessible workspaces found for the selected models. Returning to model scope selection..."
+            continue
+        }
+
+        $IncludeMyWorkspace = $false
+        $global:RunMode = 'Models'
+        $modelSelectionComplete = $true
+    } # end inner while (model selection)
+
+    # If the user backed all the way out, re-show the run-mode selector
+    if ($reportPickerCancelled) { continue }
+
 } else {
     # ---- Workspaces Mode: existing behavior ----
     $global:RunMode = 'Workspaces'
 
-    try {
-        $selection = Show-WorkspacePicker -Workspaces $workspacesResponse.value
-    }
-    catch {
-        Write-Warning "WinForms not available. Defaulting to ALL workspaces and INCLUDING My Workspace."
-        $selection = [pscustomobject]@{
-            SelectedWorkspaceIds = $workspacesResponse.value.id
-            IncludeMyWorkspace   = $true
+    $workspaceSelectionDone = $false
+    while (-not $workspaceSelectionDone) {
+        $selection = $null
+        $selectionCancelled = $false
+        try {
+            $selection = Show-WorkspacePicker -Workspaces $workspacesResponse.value
         }
+        catch {
+            $selectionCancelled = $true
+        }
+
+        if ($selectionCancelled) {
+            # User cancelled workspace picker - go back to run mode selector
+            Write-Host "[INFO] Workspace selection cancelled. Returning to run mode selection..."
+            $reportPickerCancelled = $true
+            break
+        }
+
+        # Build filtered workspaces
+        $selectedWorkspaceIds = @($selection.SelectedWorkspaceIds)
+
+        if (-not $selectedWorkspaceIds -or $selectedWorkspaceIds.Count -eq 0) {
+            Write-Warning "No workspaces selected. Please select at least one workspace."
+            continue
+        }
+
+        foreach ($workspace in $workspacesResponse.value) {
+            if ($selectedWorkspaceIds -notcontains $workspace.id) { continue }
+            $workspacesInfo += Rename-Properties -object $workspace -renameMap $workspaceRenameMap
+        }
+
+        # Flag for later "My Workspace" section
+        $IncludeMyWorkspace = $selection.IncludeMyWorkspace
+        $workspaceSelectionDone = $true
     }
 
-    # Build filtered workspaces
-    $selectedWorkspaceIds = @($selection.SelectedWorkspaceIds)
-
-    if (-not $selectedWorkspaceIds -or $selectedWorkspaceIds.Count -eq 0) {
-        throw "No workspaces selected."
-    }
-
-    foreach ($workspace in $workspacesResponse.value) {
-        if ($selectedWorkspaceIds -notcontains $workspace.id) { continue }
-        $workspacesInfo += Rename-Properties -object $workspace -renameMap $workspaceRenameMap
-    }
-
-    # Flag for later "My Workspace" section
-    $IncludeMyWorkspace = $selection.IncludeMyWorkspace
+    if ($reportPickerCancelled) { continue }
 }
 } # end while (reportPickerCancelled)
 
@@ -1458,6 +1867,16 @@ if ($global:RunMode -eq 'Reports') {
     $datasetsInfo       = @($datasetsInfo       | Where-Object { $global:SelectedDatasetIds.ContainsKey($_.DatasetId) })
     $datasetSourcesInfo = @($datasetSourcesInfo | Where-Object { $global:SelectedDatasetIds.ContainsKey($_.DatasetId) })
     Write-Host "[INFO] Filtered to $($reportsInfo.Count) report(s) and $($datasetsInfo.Count) model(s)."
+}
+
+# When running in Models mode, filter to only selected models and reports that use them
+if ($global:RunMode -eq 'Models') {
+    Write-Host "[INFO] Filtering results to selected models and connected reports..."
+    $datasetsInfo       = @($datasetsInfo       | Where-Object { $global:SelectedDatasetIds.ContainsKey($_.DatasetId) })
+    $datasetSourcesInfo = @($datasetSourcesInfo | Where-Object { $global:SelectedDatasetIds.ContainsKey($_.DatasetId) })
+    $reportsInfo        = @($reportsInfo        | Where-Object { $global:SelectedReportIds.ContainsKey($_.ReportId) })
+    $reportPagesInfo    = @($reportPagesInfo    | Where-Object { $global:SelectedReportIds.ContainsKey($_.ReportId) })
+    Write-Host "[INFO] Filtered to $($datasetsInfo.Count) model(s) and $($reportsInfo.Count) report(s)."
 }
 
 # Fetch Apps and App Reports that are in filtered workspaces
@@ -2303,7 +2722,11 @@ function Export-ReportDefinitionAsPbix {
 	        # Export based on Workspace Type
 	        if ($workspace.WorkspaceIsOnDedicatedCapacity -eq $false) {
 	            # Pro Workspace → IncludeModel (real .pbix, used for model extraction below)
-	            $null = Export-ReportUsingAPI -GroupId $workspaceId -ReportId $reportId -OutFilePath $filepath -DownloadType "IncludeModel"
+	            $includeModelExported = Export-ReportUsingAPI -GroupId $workspaceId -ReportId $reportId -OutFilePath $filepath -DownloadType "IncludeModel"
+	            if (-not $includeModelExported) {
+	                Write-Warning "IncludeModel export failed for $cleanWorkspaceName ~ $cleanReportName; falling back to getDefinition."
+	                Export-ReportDefinitionAsPbix -WorkspaceId $workspaceId -ReportId $reportId -OutFilePath $filepath | Out-Null
+	            }
 	        } elseif ($fileExtension -eq 'pbix') {
 	            # Non-Pro PBIX report (Premium / Fabric / etc.) → LiveConnect by default.
 	            # Only if LiveConnect fails do we fall back to the getDefinition export
